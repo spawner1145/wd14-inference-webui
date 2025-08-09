@@ -1,0 +1,10 @@
+numpy
+pandas
+Pillow
+onnxruntime
+huggingface-hub
+fastapi
+uvicorn
+gradio
+httpx <0.28.0
+typing-extensions
