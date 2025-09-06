@@ -131,6 +131,9 @@ utils = Utils()
 queue_lock = Lock()
 MODEL_BASE_DIR = Path(__file__).parent / "models"
 MODEL_BASE_DIR.mkdir(exist_ok=True)
+# 创建自定义缓存目录，与模型目录在同一位置
+CACHE_DIR = MODEL_BASE_DIR / "hf_cache"
+CACHE_DIR.mkdir(exist_ok=True)
 
 class Predictor:
     def __init__(self):
@@ -149,31 +152,29 @@ class Predictor:
         
         model_path = model_dir / "model.onnx"
         label_path = model_dir / "selected_tags.csv"
-    
+
         if not model_path.exists():
             print(f"下载模型: {model.repo_id} (版本: {model.revision or 'latest'})")
             temp_path = huggingface_hub.hf_hub_download(
                 repo_id=model.repo_id,
                 filename="model.onnx",
                 revision=model.revision,
-                use_auth_token=os.environ.get("HF_TOKEN")
+                use_auth_token=os.environ.get("HF_TOKEN"),
+                cache_dir=CACHE_DIR
             )
-            shutil.copy2(temp_path, model_path)
-            os.remove(temp_path)
-    
+            shutil.move(temp_path, model_path)
+
         if not label_path.exists():
             print(f"下载标签: {model.repo_id}")
             temp_path = huggingface_hub.hf_hub_download(
                 repo_id=model.repo_id,
                 filename="selected_tags.csv",
                 revision=model.revision,
-                use_auth_token=os.environ.get("HF_TOKEN")
+                use_auth_token=os.environ.get("HF_TOKEN"),
+                cache_dir=CACHE_DIR
             )
-            # 同样用 copy2 复制标签文件
-            shutil.copy2(temp_path, label_path)
-            # 手动删除临时文件
-            os.remove(temp_path)
-    
+            shutil.move(temp_path, label_path)
+
         return label_path, model_path
 
     def load_model(self, model: WaifuDiffusionInterrogator):
@@ -360,6 +361,8 @@ def run_server():
     print(f"- Gradio界面: http://{args.host}:{args.port}")
     print(f"- API文档: http://{args.host}:{args.port}/docs 或 http://{args.host}:{args.port}/redoc")
     print(f"- API接口根路径: http://{args.host}:{args.port}/tagger/v1")
+    print(f"- 模型存储目录: {MODEL_BASE_DIR}")
+    print(f"- 缓存目录: {CACHE_DIR}")
     uvicorn.run(
         app, 
         host=args.host, 
