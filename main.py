@@ -5,6 +5,7 @@ from pathlib import Path
 from threading import Lock
 import gradio as gr
 import huggingface_hub
+from huggingface_hub.utils import filter_repo_objects
 import numpy as np
 import onnxruntime as rt
 import pandas as pd
@@ -131,9 +132,6 @@ utils = Utils()
 queue_lock = Lock()
 MODEL_BASE_DIR = Path(__file__).parent / "models"
 MODEL_BASE_DIR.mkdir(exist_ok=True)
-# 创建自定义缓存目录，与模型目录在同一位置
-CACHE_DIR = MODEL_BASE_DIR / "hf_cache"
-CACHE_DIR.mkdir(exist_ok=True)
 
 class Predictor:
     def __init__(self):
@@ -155,14 +153,31 @@ class Predictor:
 
         if not model_path.exists():
             print(f"下载模型: {model.repo_id} (版本: {model.revision or 'latest'})")
-            temp_path = huggingface_hub.hf_hub_download(
-                repo_id=model.repo_id,
-                filename="model.onnx",
-                revision=model.revision,
-                use_auth_token=os.environ.get("HF_TOKEN"),
-                cache_dir=CACHE_DIR
-            )
-            shutil.move(temp_path, model_path)
+            
+            def file_filter(file_info):
+                return file_info.filename in ["model.onnx", "selected_tags.csv"]
+            
+            temp_dir = model_dir / "temp_download"
+            temp_dir.mkdir(exist_ok=True)
+            
+            try:
+                huggingface_hub.snapshot_download(
+                    repo_id=model.repo_id,
+                    revision=model.revision,
+                    local_dir=temp_dir,
+                    allow_patterns=["model.onnx", "selected_tags.csv"],
+                    use_auth_token=os.environ.get("HF_TOKEN"),
+                    local_dir_use_symlinks=False
+                )
+                
+                if (temp_dir / "model.onnx").exists():
+                    shutil.move(str(temp_dir / "model.onnx"), str(model_path))
+                
+                if (temp_dir / "selected_tags.csv").exists() and not label_path.exists():
+                    shutil.move(str(temp_dir / "selected_tags.csv"), str(label_path))
+            finally:
+                if temp_dir.exists():
+                    shutil.rmtree(temp_dir, ignore_errors=True)
 
         if not label_path.exists():
             print(f"下载标签: {model.repo_id}")
@@ -170,10 +185,16 @@ class Predictor:
                 repo_id=model.repo_id,
                 filename="selected_tags.csv",
                 revision=model.revision,
-                use_auth_token=os.environ.get("HF_TOKEN"),
-                cache_dir=CACHE_DIR
+                use_auth_token=os.environ.get("HF_TOKEN")
             )
-            shutil.move(temp_path, label_path)
+            shutil.copy2(temp_path, label_path)
+            
+            try:
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+                    print(f"已删除缓存文件: {temp_path}")
+            except Exception as e:
+                print(f"删除缓存文件时出错: {e}")
 
         return label_path, model_path
 
@@ -361,8 +382,6 @@ def run_server():
     print(f"- Gradio界面: http://{args.host}:{args.port}")
     print(f"- API文档: http://{args.host}:{args.port}/docs 或 http://{args.host}:{args.port}/redoc")
     print(f"- API接口根路径: http://{args.host}:{args.port}/tagger/v1")
-    print(f"- 模型存储目录: {MODEL_BASE_DIR}")
-    print(f"- 缓存目录: {CACHE_DIR}")
     uvicorn.run(
         app, 
         host=args.host, 
