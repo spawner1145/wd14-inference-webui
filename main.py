@@ -149,7 +149,7 @@ class Predictor:
         
         model_path = model_dir / "model.onnx"
         label_path = model_dir / "selected_tags.csv"
-
+    
         if not model_path.exists():
             print(f"下载模型: {model.repo_id} (版本: {model.revision or 'latest'})")
             temp_path = huggingface_hub.hf_hub_download(
@@ -158,8 +158,9 @@ class Predictor:
                 revision=model.revision,
                 use_auth_token=os.environ.get("HF_TOKEN")
             )
-            shutil.move(temp_path, model_path)
-
+            shutil.copy2(temp_path, model_path)
+            os.remove(temp_path)
+    
         if not label_path.exists():
             print(f"下载标签: {model.repo_id}")
             temp_path = huggingface_hub.hf_hub_download(
@@ -168,8 +169,11 @@ class Predictor:
                 revision=model.revision,
                 use_auth_token=os.environ.get("HF_TOKEN")
             )
-            shutil.move(temp_path, label_path)
-
+            # 同样用 copy2 复制标签文件
+            shutil.copy2(temp_path, label_path)
+            # 手动删除临时文件
+            os.remove(temp_path)
+    
         return label_path, model_path
 
     def load_model(self, model: WaifuDiffusionInterrogator):
