@@ -14,7 +14,7 @@ import uvicorn
 import json
 
 class WaifuDiffusionInterrogator:
-    def __init__(self, display_name: str, repo_id: str, revision: str = None, subfolder: str = None, 
+    def __init__(self, display_name: str, repo_id: str, revision: str = None, subfolder: str = None,
                  model_type: str = 'default', use_optimized_model: bool = False):
         self.display_name = display_name
         self.repo_id = repo_id
@@ -188,15 +188,22 @@ class Predictor:
 
     def get_tags_cl(self, probs, model, gen_thresh, char_thresh):
         preds = {}
-        if model.rating_indexes: p = probs[model.rating_indexes]; idx = np.argmax(p); preds['rating'] = [(model.tag_names[model.rating_indexes[idx]], p[idx])]
-        if model.quality_indexes: p = probs[model.quality_indexes]; idx = np.argmax(p); preds['quality'] = [(model.tag_names[model.quality_indexes[idx]], p[idx])]
+        if model.rating_indexes:
+            preds['rating'] = [(model.tag_names[i], probs[i]) for i in model.rating_indexes]
+        
+        if model.quality_indexes:
+            p = probs[model.quality_indexes]
+            idx = np.argmax(p)
+            preds['quality'] = [(model.tag_names[model.quality_indexes[idx]], p[idx])]
+            
         cat_map = {
             "general": (model.general_indexes, gen_thresh), "character": (model.character_indexes, char_thresh),
             "copyright": (model.copyright_indexes, char_thresh), "artist": (model.artist_indexes, char_thresh),
             "meta": (model.meta_indexes, gen_thresh)
         }
         for cat, (indices, thresh) in cat_map.items():
-            if indices: preds[cat] = sorted([(model.tag_names[i], probs[i]) for i in indices if probs[i] > thresh], key=lambda x: x[1], reverse=True)
+            if indices:
+                preds[cat] = sorted([(model.tag_names[i], probs[i]) for i in indices if probs[i] > thresh], key=lambda x: x[1], reverse=True)
         return preds
 
     def predict(self, image, model_name, general_thresh, general_mcut_enabled, character_thresh, character_mcut_enabled):
@@ -212,17 +219,26 @@ class Predictor:
         if model.model_type == 'cl_tagger':
             probs = 1 / (1 + np.exp(-np.clip(preds, -30, 30)))
             predictions = self.get_tags_cl(probs, model, general_thresh, character_thresh)
-            
-            ratings, quality = dict(predictions.get("rating", [])), dict(predictions.get("quality", []))
-            characters, artist = dict(predictions.get("character", [])), dict(predictions.get("artist", []))
-            copyright, meta = dict(predictions.get("copyright", [])), dict(predictions.get("meta", []))
-            
-            all_tags_list = []
-            for cat in ['rating', 'quality', 'artist', 'character', 'copyright', 'general', 'meta']:
-                all_tags_list.extend([t for t, p in predictions.get(cat, [])])
-            sorted_str = ", ".join(all_tags_list)
-            
-            return sorted_str, ratings, quality, characters, artist, copyright, meta, dict(predictions.get("general", []))
+
+            ratings = dict(predictions.get("rating", []))
+            quality = dict(predictions.get("quality", []))
+            characters = dict(predictions.get("character", []))
+            artist = dict(predictions.get("artist", []))
+            copyright = dict(predictions.get("copyright", []))
+            meta = dict(predictions.get("meta", []))
+            general_tags = dict(predictions.get("general", []))
+
+            combined_tags = {
+                **general_tags, 
+                **characters, 
+                **copyright, 
+                **artist, 
+                **meta
+            }
+
+            sorted_tags = sorted(combined_tags.items(), key=lambda x: x[1], reverse=True)
+            sorted_str = ",".join([tag for tag, prob in sorted_tags]).replace("(", r"\(").replace(")", r"\)")
+            return sorted_str, ratings, quality, characters, artist, copyright, meta, general_tags
 
         else: # default logic
             labels = list(zip(model.tag_names, preds.astype(float)))
@@ -240,7 +256,7 @@ class Predictor:
             
             combined_tags = {**general_tags, **character_tags}
             sorted_tags = sorted(combined_tags.items(), key=lambda x: x[1], reverse=True)
-            sorted_str = ", ".join([x[0] for x in sorted_tags]).replace("(", r"\(").replace(")", r"\)")
+            sorted_str = ",".join([x[0] for x in sorted_tags]).replace("(", r"\(").replace(")", r"\)")
             
             return sorted_str, ratings, {}, character_tags, {}, {}, {}, combined_tags
 
