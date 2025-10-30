@@ -96,7 +96,7 @@ class Predictor:
             try:
                 huggingface_hub.snapshot_download(
                     repo_id=model.repo_id, revision=model.revision, local_dir=temp_dir, allow_patterns=allowed_patterns,
-                    use_auth_token=os.environ.get("HF_TOKEN"), local_dir_use_symlinks=False
+                    local_dir_use_symlinks=False
                 )
                 src_base = temp_dir / model.subfolder if model.subfolder else temp_dir
                 if (src_base / model_filename).exists(): shutil.move(str(src_base / model_filename), str(model_path))
