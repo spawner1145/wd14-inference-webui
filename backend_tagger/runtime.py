@@ -125,6 +125,7 @@ utils.refresh_interrogators()
 class Predictor:
     def __init__(self) -> None:
         self.last_loaded_model: WaifuDiffusionInterrogator | None = None
+        self.gpu_device_id = 0
 
     def resolve_model(self, model_name: str) -> WaifuDiffusionInterrogator:
         if model_name not in utils.interrogators:
@@ -196,7 +197,20 @@ class Predictor:
             if model.model is not None:
                 del model.model
 
-            model.model = rt.InferenceSession(str(model_path), providers=["CPUExecutionProvider"])
+            providers = [
+                (
+                    "CUDAExecutionProvider",
+                    {
+                        "device_id": self.gpu_device_id,
+                        "arena_extend_strategy": "kNextPowerOfTwo",
+                        "cudnn_conv_algo_search": "NORMAL",
+                    }
+                ),
+                "CPUExecutionProvider"
+            ]
+            model.model = rt.InferenceSession(str(model_path), providers=providers)
+            print(f"[{model.display_name}] 加载完成，当前推理后端: {model.model.get_providers()}")
+
             if model.model_type == "cl_tagger":
                 model.model_target_size = 448
             else:
