@@ -1,7 +1,7 @@
 import base64
 from io import BytesIO
 from secrets import compare_digest
-from threading import Lock
+from threading import RLock
 from typing import Callable
 
 from fastapi import Depends, FastAPI, HTTPException
@@ -44,7 +44,7 @@ class InterrogatorsResponse(BaseModel):
 
 
 class Api:
-    def __init__(self, app: FastAPI, queue_lock: Lock, prefix: str | None = None) -> None:
+    def __init__(self, app: FastAPI, queue_lock: RLock, prefix: str | None = None) -> None:
         self.app = app
         self.queue_lock = queue_lock
         self.prefix = prefix

@@ -2,7 +2,7 @@ import json
 import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
-from threading import Lock
+from threading import RLock
 
 import huggingface_hub
 import numpy as np
@@ -14,7 +14,7 @@ from PIL import Image
 MODEL_BASE_DIR = Path("models/taggers")
 MODEL_BASE_DIR.mkdir(exist_ok=True, parents=True)
 
-queue_lock = Lock()
+queue_lock = RLock()
 
 
 @dataclass
