@@ -202,8 +202,6 @@ class Predictor:
                     "CUDAExecutionProvider",
                     {
                         "device_id": self.gpu_device_id,
-                        "arena_extend_strategy": "kNextPowerOfTwo",
-                        "cudnn_conv_algo_search": "NORMAL",
                     }
                 ),
                 "CPUExecutionProvider"
