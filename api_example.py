@@ -85,7 +85,7 @@ def main():
     # 硬编码配置 - 在这里修改参数
     API_BASE_URL = "http://127.0.0.1:7860/tagger/v1"  # API服务地址
     IMAGE_PATH = "ComfyUI_00082_.png"          # 要分析的图片路径
-    MODEL_NAME = "cltagger-v1.02"           # 要使用的模型名称
+    MODEL_NAME = "wd14-eva02-large-v3-git"           # 要使用的模型名称
     THRESHOLD = 0.35                       # 通用标签阈值
     CHARACTER_THRESHOLD = 0.85             # 角色标签阈值
     ENABLE_GENERAL_MCUT = False            # 是否启用通用标签MCUT
@@ -130,15 +130,20 @@ def main():
     if result:
         print("\n分析结果:")
         print(f"使用的模型: {result['model_used']}")
-        print("\n识别到的标签 (按置信度排序):")
-        
-        # 打印前20个标签
-        tags = list(result['caption'].items())
-        for i, (tag, score) in enumerate(tags[:20]):
+        all_tags = result['caption']
+        target_tags = ["general", "sensitive", "questionable", "explicit"]
+        print("\n年龄分级置信度：")
+        for tag in target_tags:
+            score = all_tags.get(tag, 0.0)
             print(f"  {tag}: {score:.4f}")
-        
-        if len(tags) > 20:
-            print(f"  ... 还有 {len(tags) - 20} 个标签未显示")
+
+        filtered_tags = [(k, v) for k, v in all_tags.items() if k not in target_tags]
+        print("\n识别到的标签 (已过滤分级标签):")
+        for i, (tag, score) in enumerate(filtered_tags[:20]):
+            print(f"  {tag}: {score:.4f}")
+
+        if len(filtered_tags) > 20:
+            print(f"  ... 还有 {len(filtered_tags) - 20} 个标签未显示")
 
 if __name__ == "__main__":
     main()
